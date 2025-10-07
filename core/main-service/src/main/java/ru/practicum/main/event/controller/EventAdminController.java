@@ -12,7 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import ru.practicum.client.StatClient;
+import ru.practicum.client.StatsOperations;
 import ru.practicum.dto.HitDto;
 import ru.practicum.main.event.dto.EventDto;
 import ru.practicum.main.event.dto.EventFilter;
@@ -28,7 +28,7 @@ import java.util.List;
 @AllArgsConstructor
 @Validated
 public class EventAdminController {
-    private final StatClient statsClient;
+    private final StatsOperations statsClient;
     private final EventService eventService;
 
     @GetMapping
@@ -53,7 +53,7 @@ public class EventAdminController {
                 .uri(request.getRequestURI())
                 .timestamp(LocalDateTime.now())
                 .build();
-        statsClient.hit(hitDto);
+        statsClient.save(hitDto);
 
         EventFilter param = EventFilter.builder()
                 .text(text)

@@ -9,11 +9,11 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import ru.practicum.client.StatsOperations;
 import ru.practicum.main.event.dto.EventDto;
 import ru.practicum.main.event.dto.EventFilter;
 import ru.practicum.main.event.dto.EventShortDto;
 import ru.practicum.main.event.service.EventService;
-import ru.practicum.client.StatClient;
 import ru.practicum.dto.HitDto;
 
 import java.time.LocalDateTime;
@@ -24,7 +24,7 @@ import java.util.List;
 @RestController
 @Validated
 public class EventPublicController {
-        private final StatClient statsClient;
+        private final StatsOperations statsClient;
         private final EventService eventService;
 
         @GetMapping
@@ -47,7 +47,7 @@ public class EventPublicController {
                                 .uri(request.getRequestURI())
                                 .timestamp(LocalDateTime.now())
                                 .build();
-                statsClient.hit(hitDto);
+                statsClient.save(hitDto);
 
                 EventFilter param = EventFilter.builder()
                                 .text(text)
@@ -74,7 +74,7 @@ public class EventPublicController {
                                 .uri(request.getRequestURI())
                                 .timestamp(LocalDateTime.now())
                                 .build();
-                statsClient.hit(hitDto);
+                statsClient.save(hitDto);
 
                 eventService.increaseViews(eventId, request.getRemoteAddr());
                 return eventService.getPublic(eventId);

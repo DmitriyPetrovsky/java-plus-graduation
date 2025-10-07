@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import ru.practicum.client.StatsOperations;
 import ru.practicum.dto.HitDto;
 import ru.practicum.dto.StatDto;
 import ru.practicum.server.service.StatService;
@@ -18,9 +19,10 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @Validated
-public class StatsController {
+public class StatsController implements StatsOperations {
     private final StatService statService;
 
+    @Override
     @PostMapping(path = "/hit")
     @ResponseStatus(HttpStatus.CREATED)
     public void save(@RequestBody @Valid HitDto newHitDto) {
@@ -28,6 +30,7 @@ public class StatsController {
                 .save(new HitDto(newHitDto.getApp(), newHitDto.getUri(), newHitDto.getIp(), newHitDto.getTimestamp()));
     }
 
+    @Override
     @GetMapping(path = "/stats")
     public List<StatDto> getStats(
                     @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,
