@@ -1,14 +1,28 @@
 services:
-  stats-server:
-    ports:
-      - "9090:9090"
+  #stats-server:
+    #ports:
+      #- "9090:9090"
 
   stats-db:
     image: postgres:16.1
-
-  ewm-service:
+    container_name: stats_db
     ports:
-      - "8080:8080"
+      - "6542:5432"
+    environment:
+      - POSTGRES_PASSWORD=12345
+      - POSTGRES_USER=dbuser
+      - POSTGRES_DB=stat_db
+
+  #ewm-service:
+    #ports:
+      #- "8080:8080"
 
   ewm-db:
     image: postgres:16.1
+    container_name: ewm_db
+    ports:
+      - "6541:5432"
+    environment:
+      - POSTGRES_PASSWORD=12345
+      - POSTGRES_USER=dbuser
+      - POSTGRES_DB=ewm_db
