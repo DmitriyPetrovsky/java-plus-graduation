@@ -1,11 +1,13 @@
 package ru.practicum.controller.event;
 
+import feign.FeignException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -16,12 +18,14 @@ import ru.practicum.dto.event.EventDto;
 import ru.practicum.dto.event.EventFilter;
 import ru.practicum.dto.event.EventShortDto;
 import ru.practicum.dto.event.UpdateEventDto;
+import ru.practicum.exception.InternalServerException;
 import ru.practicum.service.event.EventService;
 
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/admin/events")
 @RequiredArgsConstructor
@@ -46,13 +50,20 @@ public class EventAdminController {
             @RequestParam(defaultValue = "10") @Positive Integer size,
             HttpServletRequest request) {
 
-        HitDto hitDto = HitDto.builder()
-                .app("ewm-main-service")
-                .ip(request.getRemoteAddr())
-                .uri(request.getRequestURI())
-                .timestamp(LocalDateTime.now())
-                .build();
-        statsClient.save(hitDto);
+        HitDto hitDto = new HitDto();
+        hitDto.setApp("event-service");
+        hitDto.setIp(request.getRemoteAddr());
+        hitDto.setUri(request.getRequestURI());
+        hitDto.setTimestamp(LocalDateTime.now());
+
+
+        try {
+            statsClient.save(hitDto);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису stats-server.");
+            throw new InternalServerException("Ошибка при обращении к сервису request-server.");
+        }
+
 
         EventFilter param = EventFilter.builder()
                 .text(text)

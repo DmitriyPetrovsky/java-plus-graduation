@@ -21,10 +21,7 @@ import ru.practicum.dto.reuqest.ParticipationRequestDto;
 import ru.practicum.dto.reuqest.RequestStatus;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.dto.views.ViewStatDto;
-import ru.practicum.exception.AccessDeniedException;
-import ru.practicum.exception.BadConditionsException;
-import ru.practicum.exception.ConstraintViolationException;
-import ru.practicum.exception.NotFoundException;
+import ru.practicum.exception.*;
 import ru.practicum.feign.RequestOperations;
 import ru.practicum.feign.UserOperations;
 import ru.practicum.feign.ViewsOperations;
@@ -114,9 +111,13 @@ public class EventServiceImpl implements EventService {
     @Transactional
     public EventDto create(Long userId, NewEventDto newEventDto) {
         checkDateIsGoodThrowError(newEventDto.getEventDate());
-
-        if (!userClient.isUserExist(userId)) {
-            throw new NotFoundException("Пользователя с таким id не существует");
+        try {
+            if (!userClient.isUserExist(userId)) {
+                throw new NotFoundException("Пользователя с таким id не существует");
+            }
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service: {}", e.status());
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
         }
 
         if (!categoryService.existsById(newEventDto.getCategory())) {
@@ -159,8 +160,16 @@ public class EventServiceImpl implements EventService {
         if (!existsById(eventId)) {
             throw new NotFoundException("Событие не найдено");
         }
-        viewClient.add(eventId, ip);
-        ViewStatDto views = viewClient.stat(eventId);
+        ViewStatDto views;
+        try {
+            viewClient.add(eventId, ip);
+            views = viewClient.stat(eventId);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису views-service: {}", e.status());
+            throw new InternalServerException("Ошибка при обращении к сервису views-service.");
+        }
+
+
         eventRepository.setViews(eventId, views.getViews());
         eventRepository.flush();
     }
@@ -338,8 +347,13 @@ public class EventServiceImpl implements EventService {
         final String REJECTED = RequestStatus.REJECTED.toString();
         final String CONFIRMED = RequestStatus.CONFIRMED.toString();
         String setStatus = RequestStatus.valueOf(updateRequest.getStatus()).toString();
-
-        UserDto user = userClient.getUser(userId);
+        UserDto user;
+        try {
+            user = userClient.getUser(userId);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service: {}", e.status());
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
+        }
         EventDto event = getById(eventId);
 
         if (setStatus.equals(CONFIRMED) && event.getConfirmedRequests() >= event.getParticipantLimit()) {
@@ -360,8 +374,14 @@ public class EventServiceImpl implements EventService {
         }
 
         List<Long> requestsIds = updateRequest.getRequestIds();
-        List<ParticipationRequestDto> requests = requestClient
-                .findByEventIdAndIdIn(eventId, requestsIds);
+        List<ParticipationRequestDto> requests;
+        try {
+            requests = requestClient
+                    .findByEventIdAndIdIn(eventId, requestsIds);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису request-service: {}", e.status());
+            throw new InternalServerException("Ошибка при обращении к сервису request-service.");
+        }
 
         if (requests.stream().anyMatch(x -> x.getStatus().equals(REJECTED))) {
             throw new BadConditionsException(
@@ -369,12 +389,18 @@ public class EventServiceImpl implements EventService {
         }
 
         if (requests.size() > 0 && setStatus.equals(REJECTED)) {
+
             try {
                 requestClient.setStatusAll(requestsIds, REJECTED);
-            } catch (FeignException.Conflict e) {
-                log.error("Ошибка feign-клиента при обращении к сервису request-service (3)");
-                throw new BadConditionsException(e.getMessage());
+            } catch (FeignException e) {
+                log.error("Ошибка при обращении к сервису request-service: {}", e.status());
+                if (e.status() == 409) {
+                    throw new BadConditionsException("Ошибка запроса к сервису request-service.");
+                } else if (e.status() >= 500) {
+                    throw new InternalServerException("Ошибка при обращении к сервису request-service.");
+                }
             }
+
             requests.forEach(x -> x.setStatus(REJECTED));
             result.setRejectedRequests(requests);
             return result;
@@ -405,11 +431,12 @@ public class EventServiceImpl implements EventService {
                     .map(ParticipationRequestDto::getId).toList();
 
             toConfirm.forEach(x -> x.setStatus(RequestStatus.CONFIRMED.toString()));
+
             try {
                 requestClient.setStatusAll(toConfirmIds, RequestStatus.CONFIRMED.toString());
             } catch (FeignException e) {
-                log.error("Ошибка feign-клиента при обращении к сервису request-service (1)");
-                throw new BadConditionsException(e.getMessage());
+                log.error("Ошибка при обращении к сервису request-service: {}", e.status());
+                throw new InternalServerException("Ошибка при обращении к сервису request-service.");
             }
 
             List<ParticipationRequestDto> toReject = List.of();
@@ -421,11 +448,10 @@ public class EventServiceImpl implements EventService {
                         .map(ParticipationRequestDto::getId).toList();
                 try {
                     requestClient.setStatusAll(toRejectIds, REJECTED);
-                } catch (FeignException.Conflict e) {
-                    log.error("Ошибка feign-клиента при обращении к сервису request-service (2)");
-                    throw new BadConditionsException(e.getMessage());
+                } catch (FeignException e) {
+                    log.error("Ошибка при обращении к сервису request-service.");
+                    throw new InternalServerException("Ошибка при обращении к сервису request-service.");
                 }
-
             }
 
             requestsConfirmed.addAll(toConfirm);
@@ -433,7 +459,6 @@ public class EventServiceImpl implements EventService {
             result.setConfirmedRequests(requestsConfirmed);
             result.setRejectedRequests(toReject);
         }
-
         eventRepository.flush();
         return result;
     }
@@ -441,15 +466,28 @@ public class EventServiceImpl implements EventService {
     @Override
     public List<ParticipationRequestDto> findAllRequestsByEventId(Long eventId, Long userId) {
 
-        if (!userClient.isUserExist(userId)) {
-            throw new NotFoundException("Пользователя с таким id не существует");
+        try {
+            if (!userClient.isUserExist(userId)) {
+                throw new NotFoundException("Пользователя с таким id не существует");
+            }
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service.");
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
         }
+
 
         if (!eventRepository.existsById(eventId)) {
             throw new NotFoundException("События с таким id не существует");
         }
 
-        return requestClient.getByEventId(eventId);
+        List<ParticipationRequestDto> requests;
+        try {
+            requests = requestClient.getByEventId(eventId);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису request-service.");
+            throw new InternalServerException("Ошибка при обращении к сервису request-service.");
+        }
+        return requests;
     }
 
     @Override
@@ -472,9 +510,22 @@ public class EventServiceImpl implements EventService {
         List<Long> locationsIds = events.stream().map(Event::getLocationId).toList();
 
         List<CategoryDto> categories = categoryService.get(categoryIds);
-        List<UserDto> users = userClient.getUsersList(usersIds);
+        List<UserDto> users;
+        try {
+            users = userClient.getUsersList(usersIds);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service.");
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
+        }
         List<LocationDto> locations = locationService.get(locationsIds);
-        Map<Long, Long> requests = requestClient.getConfirmedEventsRequestsCount(eventsIds);
+        Map<Long, Long> requests;
+        try {
+          requests = requestClient.getConfirmedEventsRequestsCount(eventsIds);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису request-service: {}", e.status());
+            throw new BadConditionsException("Ошибка при обращении к сервису request-service.");
+        }
+
 
         Map<Long, CategoryDto> catsByIds = categories.stream()
                 .collect(Collectors.toMap(CategoryDto::getId, Function.identity()));

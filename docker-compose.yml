@@ -35,6 +35,7 @@ services:
         psql -c 'CREATE DATABASE req_db;'
         psql -c 'CREATE DATABASE event_db;'
         psql -c 'CREATE DATABASE views_db;'
+        psql -c 'CREATE DATABASE comment_db;'
         echo 'All databases created successfully!'
       "
     restart: on-failure

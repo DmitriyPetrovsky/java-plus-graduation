@@ -1,6 +1,8 @@
 package ru.practicum.service;
 
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.dto.event.EventDto;
@@ -10,6 +12,7 @@ import ru.practicum.dto.reuqest.RequestStatus;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.exception.BadConditionsException;
 import ru.practicum.exception.DuplicatedDataException;
+import ru.practicum.exception.InternalServerException;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.feign.UserOperations;
 import ru.practicum.mapper.RequestMapper;
@@ -22,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -32,7 +36,13 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
-        UserDto user = userClient.getUser(userId);
+        UserDto user;
+        try {
+            user = userClient.getUser(userId);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service.");
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
+        }
         return requestRepository.findAllByRequesterId(user.getId()).stream()
                 .map(requestMapper::toDto)
                 .collect(Collectors.toList());
@@ -72,7 +82,13 @@ public class RequestServiceImpl implements RequestService {
             throw new DuplicatedDataException("Слишком много участников");
         }
 
-        UserDto user = userClient.getUser(userId);
+        UserDto user;
+        try {
+            user = userClient.getUser(userId);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service.");
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
+        }
         ParticipationRequest request = ParticipationRequest.builder()
                 .requesterId(user.getId())
                 .eventId(event.getId())
@@ -99,7 +115,14 @@ public class RequestServiceImpl implements RequestService {
         ParticipationRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Заявка не найдена"));
 
-        UserDto user = userClient.getUser(request.getRequesterId());
+        UserDto user;
+        try {
+            user = userClient.getUser(request.getRequesterId());
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису user-service.");
+            throw new InternalServerException("Ошибка при обращении к сервису user-service.");
+        }
+
         if (!user.getId().equals(userId)) {
             throw new BadConditionsException("Нельзя отменить чужую заявку");
         }

@@ -31,6 +31,12 @@ spring:
                 - Path=/users/**,/api/users/**,/admin/users/**
               filters:
                 - StripPrefix=0
+            - id: comment_service
+              uri: lb://comment-service
+              predicates:
+                - Path=/comments/**
+              filters:
+                - StripPrefix=0
 
 
 server:

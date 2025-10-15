@@ -13,7 +13,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.reuqest.ParticipationRequestDto;
-import ru.practicum.exception.BadConditionsException;
 import ru.practicum.service.event.EventService;
 
 
