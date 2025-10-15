@@ -24,7 +24,7 @@ spring:
 
   datasource:
     driverClassName: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/stat_db
+    url: jdbc:postgresql://localhost:5432/event_db
     username: dbuser
     password: 12345
   
@@ -42,6 +42,12 @@ spring:
         format_sql: true
         jdbc:
           timezone: UTC
+      javax:
+        persistence:
+          schema-generation:
+            scripts:
+              action: create
+              create-target: create.sql
 
 ---
 # Профиль mvn spring-boot:run -Dspring-boot.run.profiles=dev
