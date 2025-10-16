@@ -10,19 +10,13 @@ spring:
             - id: event_service
               uri: lb://event-service
               predicates:
-                - Path=/events/**,/api/events/**,/admin/events/**,/users/*/events/**,/admin/categories/**,/categories/**,/compilations/**,/admin/compilations/**
+                - Path=/events/**,/api/events/**,/admin/events/**,/users/*/events/**,/admin/categories/**,/categories/**,/compilations/**,/admin/compilations/**,/views/**
               filters:
                 - StripPrefix=0
             - id: request_service
               uri: lb://request-service
               predicates:
                 - Path=/requests/**,/api/requests/**,/users/*/requests/**,/users/*/events/*/requests/**
-              filters:
-                - StripPrefix=0
-            - id: views_service
-              uri: lb://views-service
-              predicates:
-                - Path=/views/**,/api/views/**
               filters:
                 - StripPrefix=0
             - id: user_service

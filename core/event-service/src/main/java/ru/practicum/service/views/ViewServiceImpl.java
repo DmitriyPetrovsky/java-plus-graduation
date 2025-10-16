@@ -1,10 +1,10 @@
-package ru.practicum.service;
+package ru.practicum.service.views;
 
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.dto.views.ViewStatDto;
-import ru.practicum.model.View;
+import ru.practicum.model.views.View;
 import ru.practicum.repository.ViewRepository;
 
 

@@ -24,7 +24,6 @@ import ru.practicum.dto.views.ViewStatDto;
 import ru.practicum.exception.*;
 import ru.practicum.feign.RequestOperations;
 import ru.practicum.feign.UserOperations;
-import ru.practicum.feign.ViewsOperations;
 import ru.practicum.mapper.EventsMapper;
 import ru.practicum.mapper.LocationMapper;
 import ru.practicum.model.event.Event;
@@ -34,6 +33,7 @@ import ru.practicum.model.event.StateActionUser;
 import ru.practicum.repository.EventRepository;
 import ru.practicum.service.category.CategoryService;
 import ru.practicum.service.location.LocationService;
+import ru.practicum.service.views.ViewService;
 
 
 import java.time.LocalDateTime;
@@ -54,7 +54,7 @@ public class EventServiceImpl implements EventService {
     private final UserOperations userClient;
     private final CategoryService categoryService;
     private final LocationService locationService;
-    private final ViewsOperations viewClient;
+    private final ViewService viewService;
     private final JPAQueryFactory queryFactory;
     private static final int MINIMAL_MINUTES_FOR_CHANGES = 1;
 
@@ -160,14 +160,9 @@ public class EventServiceImpl implements EventService {
         if (!existsById(eventId)) {
             throw new NotFoundException("Событие не найдено");
         }
-        ViewStatDto views;
-        try {
-            viewClient.add(eventId, ip);
-            views = viewClient.stat(eventId);
-        } catch (FeignException e) {
-            log.error("Ошибка при обращении к сервису views-service: {}", e.status());
-            throw new InternalServerException("Ошибка при обращении к сервису views-service.");
-        }
+
+        viewService.add(eventId, ip);
+        ViewStatDto views = viewService.stat(eventId);
 
 
         eventRepository.setViews(eventId, views.getViews());

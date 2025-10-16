@@ -1,4 +1,4 @@
-package ru.practicum.model;
+package ru.practicum.model.views;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;

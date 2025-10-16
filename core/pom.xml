@@ -18,7 +18,6 @@
         <module>interaction-api</module>
         <module>request-service</module>
         <module>event-service</module>
-        <module>views-service</module>
         <module>comment-service</module>
     </modules>
 
