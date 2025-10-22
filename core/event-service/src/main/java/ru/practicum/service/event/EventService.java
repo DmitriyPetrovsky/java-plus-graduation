@@ -14,7 +14,7 @@ public interface EventService {
 
     List<EventDto> get(List<Long> eventIds);
 
-    EventDto getPublished(Long eventId);
+
 
     List<EventDto> getPublished(List<Long> eventIds);
 

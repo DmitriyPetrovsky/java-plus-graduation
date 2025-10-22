@@ -23,13 +23,13 @@ public class UserApiController implements UserOperations {
 
     @Override
     public UserDto getUser(long userId) {
-        log.info("Межсервисное взаимодействие: получение пользователя по ID: " + userId);
+        log.info("Межсервисное взаимодействие: получение пользователя по ID: {}", userId);
         return userService.get(userId);
     }
 
     @Override
     public Boolean isUserExist(long userId) {
-        log.info("Межсервисное взаимодействие: проверка существования пользователя с ID: " + userId);
+        log.info("Межсервисное взаимодействие: проверка существования пользователя с ID: {}", userId);
         return userService.isUserExistById(userId);
     }
 

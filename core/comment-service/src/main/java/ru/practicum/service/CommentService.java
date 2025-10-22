@@ -70,7 +70,7 @@ public class CommentService {
         }
 
         CommentDto stored = getDtoOrThrow(commentId);
-        if (userId.equals(stored.getUserId())) {
+        if (!userId.equals(stored.getUserId())) {
             throw new AccessDeniedException("Удалять комментарий может только автор или администратор");
         }
         commentRepository.deleteById(commentId);
@@ -88,20 +88,16 @@ public class CommentService {
 
     @Transactional
     public CommentDto updateCommentForEvent(Long commentId, Long userId, UpdateCommentDto dto) {
-        if (!commentRepository.existsById(commentId)) {
-            throw new NotFoundException("Комментарий с таким id не найден");
-        }
         Comment stored = commentRepository.findById(commentId)
                 .orElseThrow(() -> new NotFoundException("Комментарий не найден!"));
         if (!userId.equals(stored.getUserId())) {
             throw new AccessDeniedException("Обновлять комментарий может только автор или администратор");
         }
-
         if (dto.getText() != null) {
             stored.setText(dto.getText());
-            commentRepository.save(stored);
+            stored = commentRepository.save(stored);
         }
-        return get(commentId);
+        return CommentMapper.toCommentDto(stored);
     }
 
     public List<CommentDto> getAll(int from, int size) {

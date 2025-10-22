@@ -1,6 +1,7 @@
 package ru.practicum.service.category;
 
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,7 @@ import ru.practicum.service.event.EventServiceHelper;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 @Transactional(readOnly = true)
@@ -35,9 +37,9 @@ public class CategoryServiceImpl implements CategoryService {
         Pageable page = PageRequest.of(pageNumber, size);
 
         Page<Category> categoryPage = categoryRepository.findAll(page);
-        System.out.println("Total elements: " + categoryPage.getTotalElements()); // дебаг
-        System.out.println("Page size: " + categoryPage.getSize()); // дебаг
-        System.out.println("Content size: " + categoryPage.getContent().size()); // дебаг
+        log.debug("Total elements: {}", categoryPage.getTotalElements());
+        log.debug("Page size: {}", categoryPage.getSize());
+        log.debug("Content size: {}", categoryPage.getContent().size());
 
         return categoryPage.getContent().stream()
                 .map(categoryMapper::toDto)

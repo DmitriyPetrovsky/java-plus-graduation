@@ -14,8 +14,8 @@
     <artifactId>core</artifactId>
 
     <modules>
-        <module>user-service</module>
         <module>interaction-api</module>
+        <module>user-service</module>
         <module>request-service</module>
         <module>event-service</module>
         <module>comment-service</module>

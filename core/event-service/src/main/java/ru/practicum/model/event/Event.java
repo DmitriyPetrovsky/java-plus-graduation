@@ -2,6 +2,7 @@ package ru.practicum.model.event;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ru.practicum.dto.event.EventState;
 
 import java.time.LocalDateTime;
 
@@ -51,7 +52,8 @@ public class Event {
     private Boolean requestModeration;
 
     @Column(name = "state")
-    private String state;
+    @Enumerated(EnumType.STRING)
+    private EventState state;
 
     @Column(name = "created_on")
     private LocalDateTime createdOn;

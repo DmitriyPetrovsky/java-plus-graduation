@@ -13,7 +13,8 @@ spring:
       discovery:
         enabled: true
         serviceId: config-server
-
+app:
+  name: event-service
 
 eureka:
   client:

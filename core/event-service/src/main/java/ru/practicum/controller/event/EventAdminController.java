@@ -1,7 +1,6 @@
 package ru.practicum.controller.event;
 
-import feign.FeignException;
-import jakarta.servlet.http.HttpServletRequest;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Positive;
@@ -13,12 +12,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.client.StatsOperations;
-import ru.practicum.dto.HitDto;
 import ru.practicum.dto.event.EventDto;
 import ru.practicum.dto.event.EventFilter;
 import ru.practicum.dto.event.EventShortDto;
 import ru.practicum.dto.event.UpdateEventDto;
-import ru.practicum.exception.InternalServerException;
 import ru.practicum.service.event.EventService;
 
 
@@ -47,22 +44,9 @@ public class EventAdminController {
             @RequestParam(defaultValue = "false") Boolean onlyAvailable,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") @PositiveOrZero Integer from,
-            @RequestParam(defaultValue = "10") @Positive Integer size,
-            HttpServletRequest request) {
-
-        HitDto hitDto = new HitDto();
-        hitDto.setApp("event-service");
-        hitDto.setIp(request.getRemoteAddr());
-        hitDto.setUri(request.getRequestURI());
-        hitDto.setTimestamp(LocalDateTime.now());
+            @RequestParam(defaultValue = "10") @Positive Integer size) {
 
 
-        try {
-            statsClient.save(hitDto);
-        } catch (FeignException e) {
-            log.error("Ошибка при обращении к сервису stats-server.");
-            throw new InternalServerException("Ошибка при обращении к сервису request-server.");
-        }
 
 
         EventFilter param = EventFilter.builder()

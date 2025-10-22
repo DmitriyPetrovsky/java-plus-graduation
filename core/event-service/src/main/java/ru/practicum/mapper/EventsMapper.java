@@ -28,7 +28,7 @@ public class EventsMapper {
                 .confirmedRequests(event.getConfirmedRequests())
                 .requestModeration(event.getRequestModeration())
                 .paid(event.getPaid())
-                .state(event.getState())
+                .state(event.getState().toString())
                 .createdOn(event.getCreatedOn())
                 .views(event.getViews())
                 .build();

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
+import ru.practicum.dto.event.EventState;
 import ru.practicum.model.event.Event;
 
 import java.util.List;
@@ -17,7 +18,9 @@ import java.util.Optional;
 public interface EventRepository extends JpaRepository<Event, Long>, QuerydslPredicateExecutor<Event> {
     List<Event> findByIdIn(List<Long> userIds);
 
-    List<Event> findByIdInAndState(List<Long> userIds, String state);
+    Optional<Event> findByIdAndState(Long id, EventState state);
+
+    List<Event> findByIdInAndState(List<Long> id, EventState state);
 
     Optional<Event> findByIdAndState(Long id, String state);
 

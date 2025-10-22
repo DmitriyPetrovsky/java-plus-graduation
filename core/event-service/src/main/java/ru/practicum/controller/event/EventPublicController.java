@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.client.StatsOperations;
 import ru.practicum.dto.HitDto;
@@ -30,6 +32,9 @@ import java.util.List;
 public class EventPublicController {
     private final StatsOperations statsClient;
     private final EventService eventService;
+
+    @Value("${app.name}")
+    private String appName;
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
@@ -73,11 +78,12 @@ public class EventPublicController {
     }
 
     private void saveHit(HttpServletRequest request) {
-        HitDto hitDto = new HitDto();
-        hitDto.setApp("event-service");
-        hitDto.setIp(request.getRemoteAddr());
-        hitDto.setUri(request.getRequestURI());
-        hitDto.setTimestamp(LocalDateTime.now());
+        HitDto hitDto = new HitDto().builder()
+                .app(appName)
+                .ip(request.getRemoteAddr())
+                .uri(request.getRequestURI())
+                .timestamp(LocalDateTime.now())
+                .build();
         try {
             statsClient.save(hitDto);
         } catch (FeignException e) {

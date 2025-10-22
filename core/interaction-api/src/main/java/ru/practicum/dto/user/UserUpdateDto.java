@@ -9,11 +9,11 @@ import lombok.Setter;
 public class UserUpdateDto {
     private Long id;
 
-    @NotBlank(message = "Поле name не может быть пустым")
+    @NotEmpty(message = "Поле name не может быть пустым")
     @Size(min = 2, max = 255)
     private String name;
 
-    @NotBlank(message = "Поле email не может быть пустым")
+    @NotEmpty(message = "Поле email не может быть пустым")
     @Email
     @Size(min = 5, max = 255)
     private String email;

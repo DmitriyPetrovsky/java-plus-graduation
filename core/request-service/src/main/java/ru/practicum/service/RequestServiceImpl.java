@@ -14,6 +14,7 @@ import ru.practicum.exception.BadConditionsException;
 import ru.practicum.exception.DuplicatedDataException;
 import ru.practicum.exception.InternalServerException;
 import ru.practicum.exception.NotFoundException;
+import ru.practicum.feign.EventOperations;
 import ru.practicum.feign.UserOperations;
 import ru.practicum.mapper.RequestMapper;
 import ru.practicum.model.ParticipationRequest;
@@ -21,6 +22,7 @@ import ru.practicum.repository.RequestRepository;
 
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,6 +35,7 @@ public class RequestServiceImpl implements RequestService {
     private final RequestRepository requestRepository;
     private final UserOperations userClient;
     private final RequestMapper requestMapper;
+    private final EventOperations eventClient;
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
@@ -57,29 +60,54 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     @Transactional
-    public ParticipationRequestDto createRequest(Long userId, Long eventId, EventDto event) {
+    public ParticipationRequestDto createRequest(Long userId, Long eventId) {
+        log.info("Создание заявки для пользователя: {}, события: {}", userId, eventId);
+        EventDto event = new EventDto();
+        try {
+            event = eventClient.getEventById(eventId);
+            log.info("Событие найдено: id={}, state={}, participantLimit={}",
+                    event.getId(), event.getState(), event.getParticipantLimit());
+        } catch (FeignException e) {
+            if (e.status() == 404) {
+                log.error("Событие с ID: {} не найдено!", eventId);
+                throw new NotFoundException("Событие не найдено");
+            }
+            if (e.status() >= 500) {
+                log.error("Ошибка при обращении к сервису event-service.");
+                throw new InternalServerException("Ошибка при обращении к сервису event-service.");
+            }
+        }
+
+        // Проверка существования заявки
         if (requestRepository.findByEventIdAndRequesterId(eventId, userId).isPresent()) {
             throw new DuplicatedDataException("Заявка уже существует");
         }
 
+        // Проверка на собственное событие
         if (event.getInitiatorId().equals(userId)) {
             throw new BadConditionsException("Нельзя подавать заявку на своё собственное событие");
         }
 
-        if (event.getParticipantLimit() != 0 && !event.getState().equals(EventState.PUBLISHED.toString())) {
-            throw new BadConditionsException("Нельзя подавать заявку на неопубликованное событие");
-        }
+        // ОСНОВНОЕ ИСПРАВЛЕНИЕ: Разделяем проверки для событий с лимитом и без лимита
+        if (event.getParticipantLimit() != 0) {
+            // Для событий с лимитом проверяем публикацию
+            if (!event.getState().equals(EventState.PUBLISHED.toString())) {
+                throw new BadConditionsException("Нельзя подавать заявку на неопубликованное событие");
+            }
 
-        int requestsConfirmed = requestRepository.findAllByEventIdAndStatus(
-                eventId,
-                RequestStatus.CONFIRMED.toString()).size();
+            // Проверяем лимит участников
+            int requestsConfirmed = requestRepository.findAllByEventIdAndStatus(
+                    eventId,
+                    RequestStatus.CONFIRMED.toString()).size();
 
-        if (event.getParticipantLimit() > 0 && requestsConfirmed >= event.getParticipantLimit()) {
-            throw new BadConditionsException("Слишком много участников");
-        }
-
-        if (!event.getRequestModeration() && requestsConfirmed >= event.getParticipantLimit()) {
-            throw new DuplicatedDataException("Слишком много участников");
+            if (requestsConfirmed >= event.getParticipantLimit()) {
+                throw new BadConditionsException("Достигнут лимит участников");
+            }
+        } else {
+            // Для событий без лимита (participantLimit == 0) тоже проверяем публикацию
+            if (!event.getState().equals(EventState.PUBLISHED.toString())) {
+                throw new BadConditionsException("Нельзя подавать заявку на неопубликованное событие");
+            }
         }
 
         UserDto user;
@@ -89,6 +117,7 @@ public class RequestServiceImpl implements RequestService {
             log.error("Ошибка при обращении к сервису user-service.");
             throw new InternalServerException("Ошибка при обращении к сервису user-service.");
         }
+
         ParticipationRequest request = ParticipationRequest.builder()
                 .requesterId(user.getId())
                 .eventId(event.getId())
@@ -96,11 +125,8 @@ public class RequestServiceImpl implements RequestService {
                 .created(LocalDateTime.now())
                 .build();
 
-        if (!event.getRequestModeration()) {
-            request.setStatus(RequestStatus.CONFIRMED.toString());
-        }
-
-        if (event.getParticipantLimit().equals(0L)) {
+        // Устанавливаем статус CONFIRMED если не требуется модерация ИЛИ participantLimit == 0
+        if (!event.getRequestModeration() || event.getParticipantLimit().equals(0L)) {
             request.setStatus(RequestStatus.CONFIRMED.toString());
         }
 
@@ -149,15 +175,17 @@ public class RequestServiceImpl implements RequestService {
         return requestMapper.toDtoList(requestRepository.findByEventIdAndIdIn(eventId, requestsId));
     }
 
+
     @Override
     @Transactional
     public void setStatusAll(List<Long> ids, String status) {
-        for (ParticipationRequest request : requestRepository.findAllByIdIn(ids)) {
-            if (request.getStatus().equals(RequestStatus.CONFIRMED.toString())) {
-                throw new BadConditionsException("Нельзя отменить подтверждённую заявку");
-            }
+        List<ParticipationRequest> confirmedRequests = requestRepository.findAllByIdInAndStatusIn(
+                ids,
+                Collections.singletonList(RequestStatus.CONFIRMED.toString())
+        );
+        if (!confirmedRequests.isEmpty()) {
+            throw new BadConditionsException("Нельзя отменить подтверждённую заявку");
         }
-
         requestRepository.setStatusAll(ids, status);
         requestRepository.flush();
     }

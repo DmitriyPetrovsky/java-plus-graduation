@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.reuqest.ParticipationRequestDto;
-import ru.practicum.feign.EventOperations;
 import ru.practicum.service.RequestService;
 
 
@@ -17,7 +16,6 @@ import java.util.List;
 @RequestMapping("/users/{userId}/requests")
 @Validated
 public class ParticipationRequestController {
-    private final EventOperations eventClient;
     private final RequestService requestService;
 
     @GetMapping
@@ -30,7 +28,7 @@ public class ParticipationRequestController {
     public ParticipationRequestDto createRequest(
             @PathVariable @Positive Long userId,
             @RequestParam @Positive Long eventId) {
-        return requestService.createRequest(userId, eventId, eventClient.getEventById(eventId));
+        return requestService.createRequest(userId, eventId);
     }
 
     @PatchMapping("/{requestId}/cancel")
