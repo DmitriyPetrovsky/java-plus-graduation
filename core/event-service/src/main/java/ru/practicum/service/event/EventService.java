@@ -1,5 +1,6 @@
 package ru.practicum.service.event;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import ru.practicum.dto.event.*;
@@ -10,7 +11,7 @@ import java.util.List;
 public interface EventService {
     EventDto getById(Long eventId);
 
-    EventDto getPublic(Long eventId);
+    EventDto getPublic(Long eventId, HttpServletRequest request);
 
     List<EventDto> get(List<Long> eventIds);
 
@@ -18,9 +19,7 @@ public interface EventService {
 
     List<EventDto> getPublished(List<Long> eventIds);
 
-    List<EventShortDto> getByFilter(EventFilter filter);
-
-    void increaseViews(Long eventId, String ip);
+    List<EventShortDto> getByFilter(EventFilter filter, HttpServletRequest request);
 
     boolean existsById(Long id);
 

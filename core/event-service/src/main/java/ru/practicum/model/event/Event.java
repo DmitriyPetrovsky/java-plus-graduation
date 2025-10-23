@@ -61,6 +61,4 @@ public class Event {
     @Column(name = "published_on")
     private LocalDateTime publishedOn;
 
-    @Column(name = "views")
-    private Long views;
 }

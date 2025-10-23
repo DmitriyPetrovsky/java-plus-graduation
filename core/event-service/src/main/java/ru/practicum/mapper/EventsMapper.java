@@ -30,7 +30,6 @@ public class EventsMapper {
                 .paid(event.getPaid())
                 .state(event.getState().toString())
                 .createdOn(event.getCreatedOn())
-                .views(event.getViews())
                 .build();
     }
 
@@ -48,7 +47,6 @@ public class EventsMapper {
                 .initiatorId(event.getInitiatorId())
                 .paid(event.getPaid())
                 .title(event.getTitle())
-                .views(event.getViews())
                 .state(event.getTitle())
                 .requestModeration(event.getRequestModeration())
                 .build();
@@ -70,7 +68,6 @@ public class EventsMapper {
                 .initiator(toUserShortDto(event.getInitiator()))
                 .paid(event.getPaid())
                 .title(event.getTitle())
-                .views(event.getViews())
                 .state(event.getTitle())
                 .requestModeration(event.getRequestModeration())
                 .build();
@@ -88,7 +85,6 @@ public class EventsMapper {
                 .confirmedRequests(0L)
                 .requestModeration(event.getRequestModeration())
                 .eventDate(event.getEventDate())
-                .views(0L)
                 .build();
     }
 

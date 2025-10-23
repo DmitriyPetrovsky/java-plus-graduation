@@ -1,6 +1,5 @@
 package ru.practicum.controller.event;
 
-import feign.FeignException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -12,12 +11,9 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.client.StatsOperations;
-import ru.practicum.dto.HitDto;
 import ru.practicum.dto.event.EventDto;
 import ru.practicum.dto.event.EventFilter;
 import ru.practicum.dto.event.EventShortDto;
-import ru.practicum.exception.InternalServerException;
 import ru.practicum.service.event.EventService;
 
 
@@ -30,7 +26,6 @@ import java.util.List;
 @RestController
 @Validated
 public class EventPublicController {
-    private final StatsOperations statsClient;
     private final EventService eventService;
 
     @Value("${app.name}")
@@ -50,8 +45,6 @@ public class EventPublicController {
             @RequestParam(defaultValue = "10") @Positive Integer size,
             HttpServletRequest request) {
 
-        saveHit(request);
-
         EventFilter param = EventFilter.builder()
                 .text(text)
                 .categories(categories)
@@ -64,31 +57,13 @@ public class EventPublicController {
                 .size(size)
                 .build();
 
-        return eventService.getByFilter(param);
+        return eventService.getByFilter(param, request);
     }
 
     @GetMapping(path = "/{eventId}")
     @ResponseStatus(HttpStatus.OK)
     public EventDto getById(@PathVariable @Positive Long eventId, HttpServletRequest request) {
-
-        saveHit(request);
-
-        eventService.increaseViews(eventId, request.getRemoteAddr());
-        return eventService.getPublic(eventId);
+        return eventService.getPublic(eventId, request);
     }
 
-    private void saveHit(HttpServletRequest request) {
-        HitDto hitDto = new HitDto().builder()
-                .app(appName)
-                .ip(request.getRemoteAddr())
-                .uri(request.getRequestURI())
-                .timestamp(LocalDateTime.now())
-                .build();
-        try {
-            statsClient.save(hitDto);
-        } catch (FeignException e) {
-            log.error("Ошибка при обращении к сервису stats-server.");
-            throw new InternalServerException("Ошибка при обращении к сервису stats-server.");
-        }
-    }
 }

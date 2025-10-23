@@ -5,13 +5,19 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import feign.FeignException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriComponentsBuilder;
+import ru.practicum.client.StatsOperations;
+import ru.practicum.dto.HitDto;
+import ru.practicum.dto.StatDto;
 import ru.practicum.dto.category.CategoryDto;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.location.LocationDto;
@@ -20,7 +26,6 @@ import ru.practicum.dto.location.LocationUpdateDto;
 import ru.practicum.dto.reuqest.ParticipationRequestDto;
 import ru.practicum.dto.reuqest.RequestStatus;
 import ru.practicum.dto.user.UserDto;
-import ru.practicum.dto.views.ViewStatDto;
 import ru.practicum.exception.*;
 import ru.practicum.feign.RequestOperations;
 import ru.practicum.feign.UserOperations;
@@ -33,7 +38,6 @@ import ru.practicum.model.event.StateActionUser;
 import ru.practicum.repository.EventRepository;
 import ru.practicum.service.category.CategoryService;
 import ru.practicum.service.location.LocationService;
-import ru.practicum.service.views.ViewService;
 
 
 import java.time.LocalDateTime;
@@ -54,15 +58,40 @@ public class EventServiceImpl implements EventService {
     private final UserOperations userClient;
     private final CategoryService categoryService;
     private final LocationService locationService;
-    private final ViewService viewService;
+    private final StatsOperations statsClient;
     private final JPAQueryFactory queryFactory;
     private static final int MINIMAL_MINUTES_FOR_CHANGES = 1;
+    @Value("${app.name}")
+    private String appName;
+
+    private void saveHit(HttpServletRequest request) {
+        HitDto hitDto = HitDto.builder()
+                .app(appName)
+                .ip(request.getRemoteAddr())
+                .uri(request.getRequestURI())
+                .timestamp(LocalDateTime.now())
+                .build();
+        try {
+            statsClient.save(hitDto);
+        } catch (FeignException e) {
+            log.error("Ошибка при обращении к сервису stats-server.");
+            throw new InternalServerException("Ошибка при обращении к сервису stats-server.");
+        }
+    }
 
     @Override
-    public EventDto getPublic(Long eventId) {
-        return eventRepository.findByIdAndState(eventId, EventState.PUBLISHED)
+    public EventDto getPublic(Long eventId, HttpServletRequest request) {
+        EventDto event = eventRepository.findByIdAndState(eventId, EventState.PUBLISHED)
                 .map(this::addInfo)
                 .orElseThrow(() -> new NotFoundException("Событие с таким id не найдено"));
+        List<StatDto> stats = statsClient.getStats(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
+                List.of(request.getRequestURI()), true);
+
+        if (!stats.isEmpty()) {
+            event.setViews(stats.getFirst().getHits());
+        }
+        saveHit(request);
+        return event;
     }
 
     public EventDto getById(Long eventId) {
@@ -142,22 +171,7 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    @Transactional
-    public void increaseViews(Long eventId, String ip) {
-        if (!existsById(eventId)) {
-            throw new NotFoundException("Событие не найдено");
-        }
-
-        viewService.add(eventId, ip);
-        ViewStatDto views = viewService.stat(eventId);
-
-
-        eventRepository.setViews(eventId, views.getViews());
-        eventRepository.flush();
-    }
-
-    @Override
-    public List<EventShortDto> getByFilter(EventFilter filter) {
+    public List<EventShortDto> getByFilter(EventFilter filter, HttpServletRequest request) {
         checkFilterDateRangeIsGood(filter.getRangeStart(), filter.getRangeEnd());
 
         List<Event> events;
@@ -196,7 +210,7 @@ public class EventServiceImpl implements EventService {
         if (filter.getIsDtoForAdminApi()) {
             if (filter.getStates() != null) {
                 List<EventState> eventStates = filter.getStates().stream()
-                        .map(EventState::valueOf) // или ваш метод преобразования
+                        .map(EventState::valueOf)
                         .collect(Collectors.toList());
                 exp = exp.and(event.state.in(eventStates));
             }
@@ -214,10 +228,46 @@ public class EventServiceImpl implements EventService {
         if ("EVENT_DATE".equals(filter.getSort())) {
             events = query.orderBy(event.eventDate.asc()).fetch();
         } else {
-            events = query.orderBy(event.views.desc()).fetch();
+            events = query.fetch();
+        }
+        List<EventShortDto> result = EventsMapper.toShortDtoFromDto(addInfo(events));
+        result = applyViewsToEvents(result);
+
+        if ("VIEWS".equals(filter.getSort())) {
+            result = result.stream()
+                    .sorted((e1, e2) -> Long.compare(e2.getViews(), e1.getViews()))
+                    .collect(Collectors.toList());
+        }
+        if (!filter.getIsDtoForAdminApi()) {
+            saveHit(request);
+        }
+        return result;
+    }
+
+    private List<EventShortDto> applyViewsToEvents(List<EventShortDto> events) {
+        Map<String, EventShortDto> uriToEventMap = events.stream()
+                .collect(Collectors.toMap(
+                        event -> UriComponentsBuilder.fromUriString("/events")
+                                .pathSegment(String.valueOf(event.getId()))
+                                .toUriString(),
+                        Function.identity()
+                ));
+
+        List<StatDto> stats = statsClient.getStats(
+                LocalDateTime.now().minusMonths(1),
+                LocalDateTime.now(),
+                new ArrayList<>(uriToEventMap.keySet()),
+                true
+        );
+
+        for (StatDto stat : stats) {
+            EventShortDto dto = uriToEventMap.get(stat.getUri());
+            if (dto != null) {
+                dto.setViews(stat.getHits());
+            }
         }
 
-        return EventsMapper.toShortDtoFromDto(addInfo(events));
+        return new ArrayList<>(uriToEventMap.values());
     }
 
 

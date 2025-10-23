@@ -1,6 +1,7 @@
 package ru.practicum.controller.event;
 
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Positive;
@@ -44,7 +45,7 @@ public class EventAdminController {
             @RequestParam(defaultValue = "false") Boolean onlyAvailable,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") @PositiveOrZero Integer from,
-            @RequestParam(defaultValue = "10") @Positive Integer size) {
+            @RequestParam(defaultValue = "10") @Positive Integer size, HttpServletRequest request) {
 
 
 
@@ -63,7 +64,7 @@ public class EventAdminController {
                 .size(size)
                 .isDtoForAdminApi(true)
                 .build();
-        return eventService.getByFilter(param);
+        return eventService.getByFilter(param, request);
     }
 
     @PatchMapping("/{eventId}")

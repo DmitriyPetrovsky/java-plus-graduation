@@ -22,8 +22,6 @@ public interface EventRepository extends JpaRepository<Event, Long>, QuerydslPre
 
     List<Event> findByIdInAndState(List<Long> id, EventState state);
 
-    Optional<Event> findByIdAndState(Long id, String state);
-
     Page<Event> findAllByInitiatorId(Long userId, Pageable page);
 
     Optional<Event> findByIdAndInitiatorId(Long eventId, Long userId);
@@ -35,10 +33,6 @@ public interface EventRepository extends JpaRepository<Event, Long>, QuerydslPre
     boolean existsByCategoryId(Long categoryId);
 
     boolean existsById(@NonNull Long eventId);
-
-    @Modifying
-    @Query("UPDATE Event e SET e.views = :views WHERE e.id = :eventId")
-    void setViews(@Param("eventId") Long eventId, @Param("views") Long views);
 
     @Modifying
     @Query("UPDATE Event e SET e.confirmedRequests = :count WHERE e.id = :eventId")
