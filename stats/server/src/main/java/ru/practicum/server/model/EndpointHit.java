@@ -2,7 +2,7 @@ package ru.practicum.server.model;
 
 import java.time.LocalDateTime;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import jakarta.persistence.*;
 import lombok.*;
 

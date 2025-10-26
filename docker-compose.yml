@@ -1,28 +1,44 @@
+version: '3.8'
+
 services:
-  #stats-server:
-    #ports:
-      #- "9090:9090"
-
-  stats-db:
+  postgres:
     image: postgres:16.1
-    container_name: stats_db
+    container_name: ewm_postgres
     ports:
-      - "6542:5432"
+      - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=12345
-      - POSTGRES_USER=dbuser
-      - POSTGRES_DB=stat_db
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_USER: dbuser
+      POSTGRES_DB: stat_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbuser -d stat_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-  #ewm-service:
-    #ports:
-      #- "8080:8080"
-
-  ewm-db:
+  db-setup:
     image: postgres:16.1
-    container_name: ewm_db
-    ports:
-      - "6541:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      - POSTGRES_PASSWORD=12345
-      - POSTGRES_USER=dbuser
-      - POSTGRES_DB=ewm_db
+      PGHOST: postgres
+      PGUSER: dbuser
+      PGPASSWORD: 12345
+      PGDATABASE: stat_db
+    command: >
+      bash -c "
+        psql -c 'CREATE DATABASE ewm_db;'
+        psql -c 'CREATE DATABASE user_db;'  
+        psql -c 'CREATE DATABASE req_db;'
+        psql -c 'CREATE DATABASE event_db;'
+        psql -c 'CREATE DATABASE views_db;'
+        psql -c 'CREATE DATABASE comment_db;'
+        echo 'All databases created successfully!'
+      "
+    restart: on-failure
+
+volumes:
+  postgres_data:

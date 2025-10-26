@@ -1,5 +1,6 @@
 package ru.practicum.server.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,7 +13,6 @@ import ru.practicum.dto.HitDto;
 import ru.practicum.dto.StatDto;
 import ru.practicum.server.service.StatService;
 
-import javax.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 
