@@ -22,4 +22,7 @@ public interface RequestService {
     List<ParticipationRequestDto> findByEventIdAndIdIn(Long eventId, List<Long> requestsId);
 
     void setStatusAll(List<Long> ids, String status);
+
+    boolean isRequestExists(Long requesterId, Long eventId);
+
 }

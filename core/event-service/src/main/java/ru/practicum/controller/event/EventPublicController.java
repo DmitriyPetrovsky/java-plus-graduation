@@ -62,8 +62,21 @@ public class EventPublicController {
 
     @GetMapping(path = "/{eventId}")
     @ResponseStatus(HttpStatus.OK)
-    public EventDto getById(@PathVariable @Positive Long eventId, HttpServletRequest request) {
-        return eventService.getPublic(eventId, request);
+    public EventDto getById(@RequestHeader("X-EWM-USER-ID") long userId, @PathVariable @Positive Long eventId, HttpServletRequest request) {
+        log.info("Запрос на получение события с id: {} от пользователя с id: {}", eventId, userId);
+        return eventService.getPublic(userId, eventId, request);
+    }
+
+    @PutMapping("{eventId}/like")
+    public void likeEvent(@RequestHeader("X-EWM-USER-ID") Long userId, @PathVariable Long eventId) {
+        log.info("Запрос на лайк для события с id: {} от пользователя с id: {}", eventId, userId);
+        eventService.likeEvent(userId, eventId);
+    }
+
+    @GetMapping("/recommendations")
+    public List<EventDto> getRecommendations(@RequestHeader("X-EWM-USER-ID") Long userId) {
+        log.info("Запрос на получение рекомендаций для пользователя с id: {}", userId);
+        return eventService.getRecommendations(userId);
     }
 
 }

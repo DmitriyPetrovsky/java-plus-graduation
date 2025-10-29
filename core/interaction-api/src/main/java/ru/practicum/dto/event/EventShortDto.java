@@ -50,5 +50,5 @@ public class EventShortDto {
 
     private String state;
 
-    private Long views;
+    private Double rating;
 }

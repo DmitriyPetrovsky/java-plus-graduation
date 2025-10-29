@@ -24,4 +24,7 @@ public interface RequestOperations {
 
     @PostMapping("/api/requests/confirmed")
     Map<Long, Long> getConfirmedEventsRequestsCount(@RequestBody List<Long> eventsIds);
+
+    @GetMapping("/{eventId}/{requesterId}/exists")
+    boolean isRequestExists(@PathVariable Long requesterId, @PathVariable Long eventId);
 }

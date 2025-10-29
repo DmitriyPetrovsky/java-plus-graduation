@@ -44,4 +44,11 @@ public class RequestApiController implements RequestOperations {
         return requestService.getConfirmedEventsRequestsCount(eventsIds);
     }
 
+    @Override
+    public boolean isRequestExists(@PathVariable Long requesterId, @PathVariable Long eventId) {
+        log.info("Межсервисное взаимодействие: проверка посещения пользователем c id: {} мероприятия с id: {}",
+                 requesterId, eventId);
+        return requestService.isRequestExists(requesterId, eventId);
+    }
+
 }

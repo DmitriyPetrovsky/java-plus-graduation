@@ -10,6 +10,8 @@ import ru.practicum.dto.event.EventState;
 import ru.practicum.dto.reuqest.ParticipationRequestDto;
 import ru.practicum.dto.reuqest.RequestStatus;
 import ru.practicum.dto.user.UserDto;
+import ru.practicum.ewm.stats.client.CollectorClient;
+import ru.practicum.ewm.stats.proto.ActionTypeProto;
 import ru.practicum.exception.BadConditionsException;
 import ru.practicum.exception.DuplicatedDataException;
 import ru.practicum.exception.InternalServerException;
@@ -21,6 +23,7 @@ import ru.practicum.model.ParticipationRequest;
 import ru.practicum.repository.RequestRepository;
 
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +39,7 @@ public class RequestServiceImpl implements RequestService {
     private final UserOperations userClient;
     private final RequestMapper requestMapper;
     private final EventOperations eventClient;
+    private final CollectorClient collectorClient;
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
@@ -129,7 +133,9 @@ public class RequestServiceImpl implements RequestService {
         if (!event.getRequestModeration() || event.getParticipantLimit().equals(0L)) {
             request.setStatus(RequestStatus.CONFIRMED.toString());
         }
-
+        log.info("Начинаю отправку данных в коллектор...");
+        collectorClient.collectUserAction(userId, eventId, ActionTypeProto.ACTION_REGISTER, Instant.now());
+        log.info("Данные о создании запроса на участие в событии {} от пользователя {} успешно отправлены!", eventId, userId);
         ParticipationRequest res = requestRepository.save(request);
         requestRepository.flush();
         return requestMapper.toDto(res);
@@ -175,6 +181,10 @@ public class RequestServiceImpl implements RequestService {
         return requestMapper.toDtoList(requestRepository.findByEventIdAndIdIn(eventId, requestsId));
     }
 
+    @Override
+    public boolean isRequestExists(Long requesterId, Long eventId) {
+        return requestRepository.existsByRequesterIdAndEventId(requesterId, eventId);
+    }
 
     @Override
     @Transactional
