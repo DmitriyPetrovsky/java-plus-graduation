@@ -1,49 +1,38 @@
 package ru.practicum.kafka;
 
-import org.apache.avro.specific.SpecificRecordBase;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
-import ru.parcticum.AvroSerializer;
 import ru.practicum.ewm.stats.avro.EventSimilarityAvro;
 
-import java.time.Duration;
-import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @Service
-public class KafkaProducerService implements AutoCloseable {
-    private final KafkaProducer<String, SpecificRecordBase> producer;
+@RequiredArgsConstructor
+public class KafkaProducerService {
 
-    public KafkaProducerService(@Value("${kafka.bootstrap-servers}") String bootstrapServers) {
-        Properties config = new Properties();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, AvroSerializer.class.getName());
-        this.producer = new KafkaProducer<>(config);
-    }
+    private final KafkaTemplate<String, EventSimilarityAvro> kafkaTemplate;
 
     public void send(EventSimilarityAvro similarity, String topic) {
-        ProducerRecord<String, SpecificRecordBase> record = new ProducerRecord<>(
-                topic,
-                null,
-                similarity.getTimestamp().toEpochMilli(),
-                similarity.getEventA() + "-" + similarity.getEventB(),
-                similarity
-        );
-        producer.send(record);
-        producer.flush();
-    }
+        try {
+            String key = similarity.getEventA() + "-" + similarity.getEventB();
 
-    public void flush() {
-        producer.flush();
-    }
+            CompletableFuture<SendResult<String, EventSimilarityAvro>> future =
+                    kafkaTemplate.send(topic, key, similarity);
 
-    @Override
-    public void close() {
-        producer.flush();
-        producer.close(Duration.ofSeconds(5));
+            future.whenComplete((result, exception) -> {
+                if (exception != null) {
+                    log.error("Ошибка отправки в топик {}: {}", topic, exception.getMessage());
+                } else {
+                    log.debug("Сообщение отправлено в топик {}, offset: {}",
+                            topic, result.getRecordMetadata().offset());
+                }
+            });
+        } catch (Exception e) {
+            log.error("Критическая ошибка при отправке в топик {}: {}", topic, e.getMessage());
+        }
     }
 }
