@@ -59,22 +59,20 @@ public class RecommendationsHandler {
     public List<RecommendedEventProto> getSimilarEvents(SimilarEventsRequestProto request) {
         Long eventId = request.getEventId();
         Long userId = request.getUserId();
-        PageRequest pageRequest = PageRequest.of(0, (int) request.getMaxResult(),
-                Sort.by(Sort.Direction.DESC, "score"));
+        int limit = (int) request.getMaxResult();
+        List<EventSimilarity> similarities = similarityRepository
+                .findSimilarEventsExcludingUser(eventId, userId, PageRequest.of(0, limit));
 
-        List<EventSimilarity> similaritiesA = similarityRepository.findAllByEventA(eventId, pageRequest);
-        List<EventSimilarity> similaritiesB = similarityRepository.findAllByEventB(eventId, pageRequest);
+        return similarities.stream()
+                .map(es -> {
+                    long similarEventId = es.getEventA().equals(eventId) ? es.getEventB() : es.getEventA();
 
-        List<RecommendedEventProto> recommendations = new ArrayList<>();
-
-        addFilteredRecommendations(recommendations, similaritiesA,true, userId);
-        addFilteredRecommendations(recommendations, similaritiesB,false, userId);
-
-        recommendations.sort(Comparator.comparing(RecommendedEventProto::getScore).reversed());
-
-        return recommendations.size() > request.getMaxResult()
-                ? recommendations.subList(0, (int) request.getMaxResult())
-                : recommendations;
+                    return RecommendedEventProto.newBuilder()
+                            .setEventId(similarEventId)
+                            .setScore(es.getScore())
+                            .build();
+                })
+                .toList();
     }
 
     public List<RecommendedEventProto> getInteractionsCount(InteractionsCountRequestProto request) {
@@ -177,9 +175,20 @@ public class RecommendationsHandler {
                                            boolean isEventB,
                                            Long userId,
                                            Map<Long, Double> result) {
+        Set<Long> eventIdsToCheck = similarities.stream()
+                .map(es -> isEventB ? es.getEventB() : es.getEventA())
+                .collect(Collectors.toSet());
+        if (eventIdsToCheck.isEmpty()) {
+            return;
+        }
+        Set<Long> viewedEventIds = userActionRepository
+                .findAllByUserIdAndEventIdIn(userId, eventIdsToCheck)
+                .stream()
+                .map(UserAction::getEventId)
+                .collect(Collectors.toSet());
         for (EventSimilarity es : similarities) {
             Long relatedEventId = isEventB ? es.getEventB() : es.getEventA();
-            if (userActionRepository.existsByEventIdAndUserId(relatedEventId, userId)) {
+            if (viewedEventIds.contains(relatedEventId)) {
                 result.put(relatedEventId, es.getScore());
             }
         }
@@ -196,10 +205,22 @@ public class RecommendationsHandler {
                                             List<EventSimilarity> similarities,
                                             boolean isEventB,
                                             Long userId) {
+        // Собираем все candidate event IDs
+        Set<Long> candidateEventIds = similarities.stream()
+                .map(es -> isEventB ? es.getEventB() : es.getEventA())
+                .collect(Collectors.toSet());
+
+        if (candidateEventIds.isEmpty()) {
+            return;
+        }
+        Set<Long> viewedEventIds = userActionRepository
+                .findAllByUserIdAndEventIdIn(userId, candidateEventIds)
+                .stream()
+                .map(UserAction::getEventId)
+                .collect(Collectors.toSet());
         for (EventSimilarity es : similarities) {
             Long candidateEventId = isEventB ? es.getEventB() : es.getEventA();
-
-            if (!userActionRepository.existsByEventIdAndUserId(candidateEventId, userId)) {
+            if (!viewedEventIds.contains(candidateEventId)) {
                 recommendations.add(RecommendedEventProto.newBuilder()
                         .setEventId(candidateEventId)
                         .setScore(es.getScore())

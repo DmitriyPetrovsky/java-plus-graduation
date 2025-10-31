@@ -109,8 +109,11 @@ public class UserActionService {
         log.info("Рассчитываем схожесть событий с id = {} и {}", eventId, anotherEventId);
         double sumEvent = eventWeightSums.getOrDefault(eventId, 0.0);
         double sumAnotherEvent = eventWeightSums.getOrDefault(anotherEventId, 0.0);
-
-        return (sumEvent * sumAnotherEvent > 0) ? newMinSum / (Math.sqrt(sumEvent * sumAnotherEvent)) : 0.0;
+        if (sumEvent <= 0 || sumAnotherEvent <= 0) {
+            return 0.0;
+        }
+        double denominator = Math.sqrt(sumEvent) * Math.sqrt(sumAnotherEvent);
+        return newMinSum / denominator;
     }
 
     private EventSimilarityAvro createAvro(long eventId, long anotherEventId, double similarity, Instant timestamp) {
