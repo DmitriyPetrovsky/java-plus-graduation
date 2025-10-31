@@ -1,0 +1,31 @@
+spring:
+  sql:
+    init:
+      mode: always
+  jpa:
+    hibernate:
+      ddl-auto: none
+  datasource:
+    driverClassName: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/recommendation_db
+    username: dbuser
+    password: 12345
+
+user-action:
+  view: 0.4
+  register: 0.8
+  like: 1.0
+
+kafka:
+  bootstrap-servers: localhost:9092
+  group-id:
+    action: analyzer.actions
+    similarity: analyzer.similaritys
+  topics:
+    action: stats.user-actions.v1
+    similarity: stats.events-similarity.v1
+  auto-commit: false
+
+grpc:
+  server:
+    port: 0

@@ -28,6 +28,8 @@ public interface RequestRepository extends JpaRepository<ParticipationRequest, L
 
     Optional<ParticipationRequest> findByEventIdAndRequesterId(Long eventId, Long requestsId);
 
+    boolean existsByRequesterIdAndEventId(Long requesterId, Long eventId);
+
     @Modifying
     @Query("UPDATE ParticipationRequest r SET r.status = :status WHERE r.id IN :ids")
     void setStatusAll(@Param("ids") List<Long> ids, @Param("status") String status);

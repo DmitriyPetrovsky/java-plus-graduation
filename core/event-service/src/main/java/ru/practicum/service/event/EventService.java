@@ -11,11 +11,11 @@ import java.util.List;
 public interface EventService {
     EventDto getById(Long eventId);
 
-    EventDto getPublic(Long eventId, HttpServletRequest request);
+    EventDto getPublic(long userId, Long eventId, HttpServletRequest request);
 
     List<EventDto> get(List<Long> eventIds);
 
-
+    List<EventDto> getRecommendations(Long userId);
 
     List<EventDto> getPublished(List<Long> eventIds);
 
@@ -43,4 +43,6 @@ public interface EventService {
     List<ParticipationRequestDto> findAllRequestsByEventId(Long eventId, Long userId);
 
     List<EventShortDto> findAllByIds(List<Long> eventIds);
+
+    void likeEvent(Long userId, Long eventId);
 }

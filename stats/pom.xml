@@ -13,9 +13,11 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>dto</module>
         <module>client</module>
-        <module>server</module>
+        <module>aggregator</module>
+        <module>analyzer</module>
+        <module>serialization</module>
+        <module>collector</module>
     </modules>
 
 </project>

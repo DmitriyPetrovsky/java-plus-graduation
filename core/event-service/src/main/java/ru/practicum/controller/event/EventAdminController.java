@@ -12,7 +12,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.client.StatsOperations;
 import ru.practicum.dto.event.EventDto;
 import ru.practicum.dto.event.EventFilter;
 import ru.practicum.dto.event.EventShortDto;
@@ -29,7 +28,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Validated
 public class EventAdminController {
-    private final StatsOperations statsClient;
     private final EventService eventService;
 
     @GetMapping

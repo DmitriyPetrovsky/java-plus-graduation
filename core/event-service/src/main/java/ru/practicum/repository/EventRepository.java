@@ -14,6 +14,7 @@ import ru.practicum.model.event.Event;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface EventRepository extends JpaRepository<Event, Long>, QuerydslPredicateExecutor<Event> {
     List<Event> findByIdIn(List<Long> userIds);
@@ -39,4 +40,6 @@ public interface EventRepository extends JpaRepository<Event, Long>, QuerydslPre
     void setContirmedRequestsCount(
             @Param("eventId") Long eventId,
             @Param("count") Long count);
+
+    Set<Event> findAllByIdIn(Set<Long> ids);
 }

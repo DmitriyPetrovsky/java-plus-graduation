@@ -10,6 +10,8 @@ import ru.practicum.dto.event.EventState;
 import ru.practicum.dto.reuqest.ParticipationRequestDto;
 import ru.practicum.dto.reuqest.RequestStatus;
 import ru.practicum.dto.user.UserDto;
+import ru.practicum.ewm.stats.client.CollectorClient;
+import ru.practicum.ewm.stats.proto.ActionTypeProto;
 import ru.practicum.exception.BadConditionsException;
 import ru.practicum.exception.DuplicatedDataException;
 import ru.practicum.exception.InternalServerException;
@@ -21,6 +23,7 @@ import ru.practicum.model.ParticipationRequest;
 import ru.practicum.repository.RequestRepository;
 
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +39,7 @@ public class RequestServiceImpl implements RequestService {
     private final UserOperations userClient;
     private final RequestMapper requestMapper;
     private final EventOperations eventClient;
+    private final CollectorClient collectorClient;
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
@@ -78,24 +82,19 @@ public class RequestServiceImpl implements RequestService {
             }
         }
 
-        // Проверка существования заявки
         if (requestRepository.findByEventIdAndRequesterId(eventId, userId).isPresent()) {
             throw new DuplicatedDataException("Заявка уже существует");
         }
 
-        // Проверка на собственное событие
         if (event.getInitiatorId().equals(userId)) {
             throw new BadConditionsException("Нельзя подавать заявку на своё собственное событие");
         }
 
-        // ОСНОВНОЕ ИСПРАВЛЕНИЕ: Разделяем проверки для событий с лимитом и без лимита
         if (event.getParticipantLimit() != 0) {
-            // Для событий с лимитом проверяем публикацию
             if (!event.getState().equals(EventState.PUBLISHED.toString())) {
                 throw new BadConditionsException("Нельзя подавать заявку на неопубликованное событие");
             }
 
-            // Проверяем лимит участников
             int requestsConfirmed = requestRepository.findAllByEventIdAndStatus(
                     eventId,
                     RequestStatus.CONFIRMED.toString()).size();
@@ -104,7 +103,6 @@ public class RequestServiceImpl implements RequestService {
                 throw new BadConditionsException("Достигнут лимит участников");
             }
         } else {
-            // Для событий без лимита (participantLimit == 0) тоже проверяем публикацию
             if (!event.getState().equals(EventState.PUBLISHED.toString())) {
                 throw new BadConditionsException("Нельзя подавать заявку на неопубликованное событие");
             }
@@ -125,11 +123,12 @@ public class RequestServiceImpl implements RequestService {
                 .created(LocalDateTime.now())
                 .build();
 
-        // Устанавливаем статус CONFIRMED если не требуется модерация ИЛИ participantLimit == 0
         if (!event.getRequestModeration() || event.getParticipantLimit().equals(0L)) {
             request.setStatus(RequestStatus.CONFIRMED.toString());
         }
-
+        log.info("Начинаю отправку данных в коллектор...");
+        collectorClient.collectUserAction(userId, eventId, ActionTypeProto.ACTION_REGISTER, Instant.now());
+        log.info("Данные о создании запроса на участие в событии {} от пользователя {} успешно отправлены!", eventId, userId);
         ParticipationRequest res = requestRepository.save(request);
         requestRepository.flush();
         return requestMapper.toDto(res);
@@ -175,6 +174,10 @@ public class RequestServiceImpl implements RequestService {
         return requestMapper.toDtoList(requestRepository.findByEventIdAndIdIn(eventId, requestsId));
     }
 
+    @Override
+    public boolean isRequestExists(Long requesterId, Long eventId) {
+        return requestRepository.existsByRequesterIdAndEventId(requesterId, eventId);
+    }
 
     @Override
     @Transactional

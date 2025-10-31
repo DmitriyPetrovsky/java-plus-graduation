@@ -75,3 +75,4 @@ spring:
         show_sql: false
         jdbc:
           timezone: UTC
+

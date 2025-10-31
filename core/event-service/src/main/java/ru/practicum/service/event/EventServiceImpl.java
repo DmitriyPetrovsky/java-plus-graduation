@@ -8,16 +8,12 @@ import feign.FeignException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.UriComponentsBuilder;
-import ru.practicum.client.StatsOperations;
-import ru.practicum.dto.HitDto;
-import ru.practicum.dto.StatDto;
+
 import ru.practicum.dto.category.CategoryDto;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.location.LocationDto;
@@ -26,6 +22,10 @@ import ru.practicum.dto.location.LocationUpdateDto;
 import ru.practicum.dto.reuqest.ParticipationRequestDto;
 import ru.practicum.dto.reuqest.RequestStatus;
 import ru.practicum.dto.user.UserDto;
+import ru.practicum.ewm.stats.client.AnalyzerClient;
+import ru.practicum.ewm.stats.client.CollectorClient;
+import ru.practicum.ewm.stats.proto.ActionTypeProto;
+import ru.practicum.ewm.stats.proto.RecommendedEventProto;
 import ru.practicum.exception.*;
 import ru.practicum.feign.RequestOperations;
 import ru.practicum.feign.UserOperations;
@@ -40,10 +40,12 @@ import ru.practicum.service.category.CategoryService;
 import ru.practicum.service.location.LocationService;
 
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -58,40 +60,27 @@ public class EventServiceImpl implements EventService {
     private final UserOperations userClient;
     private final CategoryService categoryService;
     private final LocationService locationService;
-    private final StatsOperations statsClient;
+    private final CollectorClient collectorClient;
+    private final AnalyzerClient analyzerClient;
     private final JPAQueryFactory queryFactory;
     private static final int MINIMAL_MINUTES_FOR_CHANGES = 1;
-    @Value("${app.name}")
-    private String appName;
 
-    private void saveHit(HttpServletRequest request) {
-        HitDto hitDto = HitDto.builder()
-                .app(appName)
-                .ip(request.getRemoteAddr())
-                .uri(request.getRequestURI())
-                .timestamp(LocalDateTime.now())
-                .build();
-        try {
-            statsClient.save(hitDto);
-        } catch (FeignException e) {
-            log.error("Ошибка при обращении к сервису stats-server.");
-            throw new InternalServerException("Ошибка при обращении к сервису stats-server.");
-        }
-    }
 
     @Override
-    public EventDto getPublic(Long eventId, HttpServletRequest request) {
+    public EventDto getPublic(long userId, Long eventId, HttpServletRequest request) {
         EventDto event = eventRepository.findByIdAndState(eventId, EventState.PUBLISHED)
                 .map(this::addInfo)
                 .orElseThrow(() -> new NotFoundException("Событие с таким id не найдено"));
-        List<StatDto> stats = statsClient.getStats(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                List.of(request.getRequestURI()), true);
-
-        if (!stats.isEmpty()) {
-            event.setViews(stats.getFirst().getHits());
-        }
-        saveHit(request);
+        collectorClient.collectUserAction(userId, eventId, ActionTypeProto.ACTION_VIEW, Instant.now());
         return event;
+    }
+
+    @Override
+    public void likeEvent(Long userId, Long eventId) {
+        if (!requestClient.isRequestExists(userId, eventId)) {
+            throw new ValidationException("Пользователь id: " + userId + " не посещал событие c id: " + eventId);
+        }
+        collectorClient.collectUserAction(userId, eventId, ActionTypeProto.ACTION_LIKE, Instant.now());
     }
 
     public EventDto getById(Long eventId) {
@@ -233,43 +222,25 @@ public class EventServiceImpl implements EventService {
         List<EventShortDto> result = EventsMapper.toShortDtoFromDto(addInfo(events));
         result = applyViewsToEvents(result);
 
-        if ("VIEWS".equals(filter.getSort())) {
-            result = result.stream()
-                    .sorted((e1, e2) -> Long.compare(e2.getViews(), e1.getViews()))
-                    .collect(Collectors.toList());
-        }
-        if (!filter.getIsDtoForAdminApi()) {
-            saveHit(request);
-        }
         return result;
     }
 
     private List<EventShortDto> applyViewsToEvents(List<EventShortDto> events) {
-        Map<String, EventShortDto> uriToEventMap = events.stream()
-                .collect(Collectors.toMap(
-                        event -> UriComponentsBuilder.fromUriString("/events")
-                                .pathSegment(String.valueOf(event.getId()))
-                                .toUriString(),
-                        Function.identity()
-                ));
 
-        List<StatDto> stats = statsClient.getStats(
-                LocalDateTime.now().minusMonths(1),
-                LocalDateTime.now(),
-                new ArrayList<>(uriToEventMap.keySet()),
-                true
-        );
-
-        for (StatDto stat : stats) {
-            EventShortDto dto = uriToEventMap.get(stat.getUri());
-            if (dto != null) {
-                dto.setViews(stat.getHits());
-            }
-        }
-
-        return new ArrayList<>(uriToEventMap.values());
+        return events;
     }
 
+    @Override
+    public List<EventDto> getRecommendations(Long userId) {
+        Set<Long> eventIds = analyzerClient.getRecommendationsForUser(userId, 10)
+                .map(RecommendedEventProto::getEventId).collect(Collectors.toSet());
+
+        return eventRepository
+                .findAllByIdIn(eventIds)
+                .stream()
+                .map(EventsMapper::toDto)
+                .toList();
+    }
 
     @Override
     @Transactional
